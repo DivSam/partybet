@@ -2,25 +2,28 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
-	"fmt"
-	"time"
+	"partybet/internal/models"
 
 	"github.com/gorilla/mux"
-
-	"nhooyr.io/websocket"
+	"github.com/gorilla/websocket"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow connections from any origin
+	},
+}
 
 func (s *Server) RegisterRoutes() http.Handler {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/", s.HelloWorldHandler)
 
-	r.HandleFunc("/health", s.healthHandler)
-
-	r.HandleFunc("/websocket", s.websocketHandler)
+	r.HandleFunc("/events/{id}", s.HandleNewEvent).Methods("POST")
 
 	return r
 }
@@ -37,37 +40,37 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(jsonResp)
 }
 
-func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	jsonResp, err := json.Marshal(s.db.Health())
+func (s *Server) HandleNewEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
 
+	var event models.Event
+
+	fmt.Printf("Request: %v\n", r.Body)
+
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	defer r.Body.Close()
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Fatalf("error upgrading connection. Err: %v", err)
+	}
+
+	defer conn.Close()
+
+	eventJson, err := json.Marshal(event)
 	if err != nil {
 		log.Fatalf("error handling JSON marshal. Err: %v", err)
 	}
 
-	_, _ = w.Write(jsonResp)
-}
-
-func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
-	socket, err := websocket.Accept(w, r, nil)
-
-	if err != nil {
-		log.Printf("could not open websocket: %v", err)
-		_, _ = w.Write([]byte("could not open websocket"))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if err := conn.WriteMessage(websocket.TextMessage, eventJson); err != nil {
+		log.Fatalf("error writing message. Err: %v", err)
 	}
 
-	defer socket.Close(websocket.StatusGoingAway, "server closing websocket")
-
-	ctx := r.Context()
-	socketCtx := socket.CloseRead(ctx)
-
-	for {
-		payload := fmt.Sprintf("server timestamp: %d", time.Now().UnixNano())
-		err := socket.Write(socketCtx, websocket.MessageText, []byte(payload))
-		if err != nil {
-			break
-		}
-		time.Sleep(time.Second * 2)
-	}
 }
