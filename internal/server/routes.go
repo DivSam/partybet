@@ -13,11 +13,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow connections from any origin
-	},
-}
+var (
+	clients   = make(map[*websocket.Conn]bool)
+	broadcast = make(chan models.Bet)
+	upgrader  = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+)
 
 var (
 	events      = make(map[int]*models.Event)
@@ -65,4 +69,41 @@ func (s *Server) HandleNewEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(event)
 
+}
+
+func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+
+	if err != nil {
+		log.Fatalf("error upgrading connection to websocket. Err: %v", err)
+	}
+
+	defer ws.Close()
+
+	clients[ws] = true
+
+	for {
+		var bet models.Bet
+		err := ws.ReadJSON(&bet)
+		if err != nil {
+			log.Printf("error reading JSON. Err: %v", err)
+			delete(clients, ws)
+			break
+		}
+
+		// we send the bet to the broadcasts
+		broadcast <- bet
+	}
+
+}
+
+func HandleBroadcast() {
+	for {
+		// bet := <-broadcast
+
+		eventsMutex.Lock()
+		//TODO: handle core betting logic here
+
+		eventsMutex.Unlock()
+	}
 }
