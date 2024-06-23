@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	clients   = make(map[*websocket.Conn]bool)
+	clients   = make(map[int]map[*websocket.Conn]bool)
 	broadcast = make(chan models.Bet)
 	upgrader  = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -83,21 +83,28 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 
 	defer ws.Close()
 
-	clients[ws] = true
-
 	for {
 		var bet models.Bet
 		err := ws.ReadJSON(&bet)
+
+		fmt.Println("bet: ", bet)
+
 		if err != nil {
 			log.Printf("error reading JSON. Err: %v", err)
-			delete(clients, ws)
 			break
 		}
 
+		eventIdInt := bet.EventID
+		if clients[eventIdInt] == nil {
+			clients[eventIdInt] = make(map[*websocket.Conn]bool)
+		}
+		clients[eventIdInt][ws] = true
+
+		fmt.Println("clients: ", clients)
 		// we send the bet to the broadcasts
 		broadcast <- bet
-	}
 
+	}
 }
 
 func HandleBroadcast() {
@@ -112,12 +119,13 @@ func HandleBroadcast() {
 
 		eventsMutex.Unlock()
 
-		for client := range clients {
+		// send event to all clients with the same event id
+		for client := range clients[bet.EventID] {
 			err := client.WriteJSON(event)
 			if err != nil {
 				log.Printf("error writing JSON. Err: %v", err)
 				client.Close()
-				delete(clients, client)
+				delete(clients[bet.EventID], client)
 			}
 		}
 
