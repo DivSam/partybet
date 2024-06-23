@@ -34,6 +34,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.HandleFunc("/", s.HelloWorldHandler)
 
 	r.HandleFunc("/event", s.HandleNewEvent).Methods("POST")
+	r.HandleFunc("/ws", s.HandleNewWebsocketConnection)
+
+	go HandleBroadcast()
 
 	fmt.Println("Server is running on port: ", s.port)
 
@@ -99,11 +102,24 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 
 func HandleBroadcast() {
 	for {
-		// bet := <-broadcast
+		bet := <-broadcast
+
+		event := events[bet.EventID]
 
 		eventsMutex.Lock()
 		//TODO: handle core betting logic here
+		event.UpdateHandle(bet.Outcome, bet.Amount)
 
 		eventsMutex.Unlock()
+
+		for client := range clients {
+			err := client.WriteJSON(event)
+			if err != nil {
+				log.Printf("error writing JSON. Err: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
+
 	}
 }

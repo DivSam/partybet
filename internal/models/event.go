@@ -29,16 +29,16 @@ func NewEvent(id int, name string, date string, duration string, outcome bool, t
 	}
 }
 
-func (e *Event) updateHandleYes(amount float32) {
-	e.HandleYes += amount
+func (e *Event) UpdateHandle(outcome bool, amount float32) {
+	if outcome {
+		e.HandleYes += amount
+	} else {
+		e.HandleNo += amount
+	}
+
 	e.Total += amount
 }
 
-func (e *Event) updateHandleNo(amount float32) {
-	e.HandleNo += amount
-	e.Total += amount
-}
-
-func (e *Event) updateOutcome(outcome bool) {
+func (e *Event) UpdateOutcome(outcome bool) {
 	e.Outcome = outcome
 }
