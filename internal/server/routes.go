@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"partybet/internal/models"
 
@@ -18,12 +19,19 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var (
+	events      = make(map[int]*models.Event)
+	eventsMutex sync.Mutex
+)
+
 func (s *Server) RegisterRoutes() http.Handler {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/", s.HelloWorldHandler)
 
-	r.HandleFunc("/events/{id}", s.HandleNewEvent).Methods("POST")
+	r.HandleFunc("/event", s.HandleNewEvent).Methods("POST")
+
+	fmt.Println("Server is running on port: ", s.port)
 
 	return r
 }
@@ -41,36 +49,20 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleNewEvent(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var event models.Event
-
-	fmt.Printf("Request: %v\n", r.Body)
-
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	err := json.NewDecoder(r.Body).Decode(&event)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	defer r.Body.Close()
+	// TODO: have some error handling for the payload, it needs to have all the fields (maybe we handle this in the client application)
 
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Fatalf("error upgrading connection. Err: %v", err)
-	}
+	eventsMutex.Lock()
+	events[event.ID] = &event // will use UUID or something in the client application
+	eventsMutex.Unlock()
 
-	defer conn.Close()
-
-	eventJson, err := json.Marshal(event)
-	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
-	}
-
-	if err := conn.WriteMessage(websocket.TextMessage, eventJson); err != nil {
-		log.Fatalf("error writing message. Err: %v", err)
-	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(event)
 
 }
