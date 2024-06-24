@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"partybet/internal/models"
@@ -83,6 +84,16 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 
 	defer ws.Close()
 
+	eventId, err := strconv.Atoi(r.URL.Query().Get("event_id"))
+	if err != nil {
+		log.Fatalf("error parsing event_id. Err: %v", err)
+	}
+
+	if clients[eventId] == nil {
+		clients[eventId] = make(map[*websocket.Conn]bool)
+	}
+	clients[eventId][ws] = true
+
 	for {
 		var bet models.Bet
 		err := ws.ReadJSON(&bet)
@@ -94,13 +105,7 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 			break
 		}
 
-		eventIdInt := bet.EventID
-		if clients[eventIdInt] == nil {
-			clients[eventIdInt] = make(map[*websocket.Conn]bool)
-		}
-		clients[eventIdInt][ws] = true
-
-		fmt.Println("clients: ", clients)
+		// fmt.Println("clients: ", clients)
 		// we send the bet to the broadcasts
 		broadcast <- bet
 
@@ -119,6 +124,8 @@ func HandleBroadcast() {
 
 		eventsMutex.Unlock()
 
+		fmt.Println("event: ", event.Total, event.HandleYes, event.HandleNo)
+		fmt.Println(len(clients[bet.EventID]))
 		// send event to all clients with the same event id
 		for client := range clients[bet.EventID] {
 			err := client.WriteJSON(event)
