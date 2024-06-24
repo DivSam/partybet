@@ -32,8 +32,6 @@ var (
 func (s *Server) RegisterRoutes() http.Handler {
 	r := mux.NewRouter()
 
-	r.HandleFunc("/", s.HelloWorldHandler)
-
 	r.HandleFunc("/event", s.HandleNewEvent).Methods("POST")
 	r.HandleFunc("/ws", s.HandleNewWebsocketConnection)
 
@@ -42,18 +40,6 @@ func (s *Server) RegisterRoutes() http.Handler {
 	fmt.Println("Server is running on port: ", s.port)
 
 	return r
-}
-
-func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
-	resp := make(map[string]string)
-	resp["message"] = "Hello World"
-
-	jsonResp, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
-	}
-
-	_, _ = w.Write(jsonResp)
 }
 
 func (s *Server) HandleNewEvent(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +91,6 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 			break
 		}
 
-		// fmt.Println("clients: ", clients)
 		// we send the bet to the broadcasts
 		broadcast <- bet
 
@@ -125,7 +110,7 @@ func HandleBroadcast() {
 		eventsMutex.Unlock()
 
 		fmt.Println("event: ", event.Total, event.HandleYes, event.HandleNo)
-		fmt.Println(len(clients[bet.EventID]))
+
 		// send event to all clients with the same event id
 		for client := range clients[bet.EventID] {
 			err := client.WriteJSON(event)
