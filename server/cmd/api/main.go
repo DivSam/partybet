@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"partybet/internal/server"
+	"partybet/server/internal/server"
 )
 
 func main() {

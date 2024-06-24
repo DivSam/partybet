@@ -1,4 +1,4 @@
-module partybet
+module partybet/server
 
 go 1.22.1
 

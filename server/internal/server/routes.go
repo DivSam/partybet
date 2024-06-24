@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"sync"
 
-	"partybet/internal/models"
+	"partybet/server/internal/models"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"

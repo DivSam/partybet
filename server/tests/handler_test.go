@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"partybet/internal/server"
+	"partybet/server/internal/server"
 	"testing"
 )
 
