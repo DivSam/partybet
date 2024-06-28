@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"partybet/server/internal/models"
 
@@ -108,4 +109,17 @@ func HandleBroadcast() {
 		}
 
 	}
+}
+
+func (s *Server) StartEventTimer(eventId int, duration string) {
+	//TODO: need to calculate delta time from now to the start of the event
+	realDuration, _ := time.ParseDuration(duration)
+	time.AfterFunc(realDuration, func() {
+		if conns, ok := clients[eventId]; ok {
+			for ws := range conns {
+				ws.Close()
+			}
+			delete(clients, eventId)
+		}
+	})
 }
