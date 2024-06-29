@@ -64,6 +64,10 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 
 	if clients[eventId] == nil {
 		clients[eventId] = make(map[*websocket.Conn]bool)
+
+		if event, exists := events[eventId]; exists {
+			s.StartEventTimer(eventId, event.Duration)
+		}
 	}
 	clients[eventId][ws] = true
 
@@ -119,6 +123,7 @@ func (s *Server) StartEventTimer(eventId int, duration string) {
 			for ws := range conns {
 				ws.Close()
 			}
+			fmt.Println("event finished, closing all connections")
 			delete(clients, eventId)
 		}
 	})
