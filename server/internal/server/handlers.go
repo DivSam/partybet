@@ -65,6 +65,7 @@ func (s *Server) HandleNewWebsocketConnection(w http.ResponseWriter, r *http.Req
 	if clients[eventId] == nil {
 		clients[eventId] = make(map[*websocket.Conn]bool)
 
+		// the hack here is going to be to send an empty ws message to the server upon creation if the creator doesn't want to bet
 		if event, exists := events[eventId]; exists {
 			s.StartEventTimer(eventId, event.Duration)
 		}
@@ -116,7 +117,6 @@ func HandleBroadcast() {
 }
 
 func (s *Server) StartEventTimer(eventId int, duration string) {
-	//TODO: need to calculate delta time from now to the start of the event
 	realDuration, _ := time.ParseDuration(duration)
 	time.AfterFunc(realDuration, func() {
 		if conns, ok := clients[eventId]; ok {
